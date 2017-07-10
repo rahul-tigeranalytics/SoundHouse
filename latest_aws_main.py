@@ -6,7 +6,6 @@ import datetime
 import traceback
 import logging
 import calendar
-import unidecode
 from dateutil.parser import parse
 import pyspark
 from pyspark.sql import SQLContext
@@ -34,17 +33,16 @@ class ETL_Processing(object):
         logger.info("Inside __init__() method ")
         self.logger=logger
         self.sqlCtx = sqlCtx
-        #self.url="jdbc:mysql://localhost:3306/SoundHouse?user=root&password=Premalatha@123&autoReconnect=true&useSSL=false"
-        self.url="jdbc:mysql://soundhousetestdb.c4q9tpcfjner.us-east-2.rds.amazonaws.com/SoundHouse?user=admin&password=admin123"
+        self.url="jdbc:mysql://soundhousemasterdb.c4q9tpcfjner.us-east-2.rds.amazonaws.com:3306/SoundHouse?user=dbadmin&password=dbadmin123&autoReconnect=true&useSSL=false"
         self.properties={"driver":'com.mysql.jdbc.Driver'}
         execfile(property_file_path)
         # print locals()['metadata_property']
         # import pdb;pdb.set_trace()
         # The property file should always have the dict variable name as "metadata_property"
         self.metadata_property = locals()['metadata_property']
-        self.mysqldb_port = "soundhousetestdb.c4q9tpcfjner.us-east-2.rds.amazonaws.com"
-        self.mysqldb_user = "admin"
-        self.mysqldb_password = "admin123"
+        self.mysqldb_port = "soundhousemasterdb.c4q9tpcfjner.us-east-2.rds.amazonaws.com"
+        self.mysqldb_user = "dbadmin"
+        self.mysqldb_password = "dbadmin123"
         self.mysqldb_database_name = "SoundHouse"
         self.title_case_cols = ['Artist','Track','Album','Service_Provider','Service_Type','Territory']
         return
@@ -66,9 +64,9 @@ class ETL_Processing(object):
             file_split= file_name.split('.csv')[0].split('_')
             year = str(file_split[-1])
             qt_months= {'QT1': 'Mar', 'QT2': 'Jun', 'QT3': 'Sep', 'QT4': 'Dec'}
-            print qt_months
+            # print qt_months
             month_split =file_split[-2]
-            print month_split
+            # print month_split
             if str(month_split).upper() in qt_months.keys():
                 qt_key= str(month_split).upper()
                 month = str(parse(file_split[-1] +" " +qt_months[qt_key]+" 01").month)  #qt_months[qt_key]
@@ -76,7 +74,7 @@ class ETL_Processing(object):
             else:
                 month = str(parse(file_split[-1] +" " +file_split[-2]+" 01").month)
                 day = str(calendar.monthrange(int(file_split[-1]),parse(file_split[-1] +" " +file_split[-2]+ " 01").month)[1])
-            print year, month, day
+            # print year, month, day
             report_date = parse(year+" "+ month+" "+day)
             report_date_string =str(report_date.date())
             #report_date = calendar.monthrange(file_split[-1],file_split[-2])
@@ -149,10 +147,6 @@ class ETL_Processing(object):
                 meta_insert_df= self.sqlCtx.createDataFrame([(self.deal_name,self.vendor_name,report_date_string,source_column_string,str(datetime.datetime.now()))], ['deal_name', 'vendor_name','report_date','file_headers','create_date'])
                 meta_insert_df.show(1)
                 return meta_insert_df
-                # meta_insert_df.write.jdbc(self.url,
-                #                    table="Metadata_Management",
-                #                    mode="append",
-                #                    properties=self.properties)
             return
         except Exception,e:
             raise Exception("Error while executing metadata_management_versioning() :"+str(e))
@@ -216,18 +210,6 @@ class ETL_Processing(object):
         """
         try:
             logger.info("Inside mapping_source_to_destination() method ")
-            # print "Metadata KEYYYYY AND VALUE"
-            # for key,value in self.metadata_property.iteritems():
-            #     print key,value
-
-            # print df.columns
-
-            for col_name in df.columns:
-                if '.' in col_name:
-                    df = df.withColumnRenamed(col_name, col_name.replace('.',' '))
-
-            df.show()
-
             for i in range(len(self.metadata_property)):
                 #import pdb;pdb.set_trace()
                 # if metadata_property.keys()[i] in ('Net_Payment','Quantity'):
@@ -241,8 +223,8 @@ class ETL_Processing(object):
                                     if col in df.columns:
                                         df = df.withColumn(col, sf.when(self.null_val_udf(col), 0.0).otherwise(df[col]))
                                         df = df.withColumn(col, self.replace_comma_func(col))
-                                        print "Inside DF"
-                                        df.show()
+                                        # print "Inside DF"
+                                        # df.show()
                                         # df = df.withColumn(col, self.float_func(col))
                                 # df= df.withColumn(metadata_property.keys()[i], sum(df[col].cast(FloatType()) for col in comb_headers))
                                 df= df.withColumn(self.metadata_property.keys()[i], sum(df[col] for col in comb_headers))
@@ -250,41 +232,6 @@ class ETL_Processing(object):
                     else:
                         if self.metadata_property.keys()[i] not in df.columns:
                             df= df.withColumnRenamed(s_header, self.metadata_property.keys()[i])
-                        # break
-                    # break
-
-            # print "DF SCHEMAAAAAAAAAAAAAAAAA"
-            # df.printSchema()
-            # df.show()
-
-            # class ContinueI(Exception):
-            #      pass
-            # continue_i = ContinueI()
-            # #df.write.format('com.databricks.spark.csv').save('/home/rahul/Downloads/Sound_House/Code_design/01_Output/')
-            # for i in range(len(self.metadata_property)):
-            #     # try:
-            #         # print df.columns
-            #     for s_header in self.metadata_property.values()[i]:
-            #         if '++' in s_header:
-            #             comb_headers = s_header.split('++')
-            #             if set(comb_headers)<set(df.columns):
-            #                 for col in comb_headers:
-            #                     if col in df.columns:
-            #                         df = df.withColumn(col, self.float_func(col))
-            #                 # if set(comb_headers)<set(df.columns):
-            #                 df = df.withColumn(self.metadata_property.keys()[i], sum(df[col] for col in comb_headers))
-            #             # raise continue_i
-            #             break
-            #
-            #         else:
-            #             df = df.withColumnRenamed(s_header, self.metadata_property.keys()[i])
-            #             # raise continue_i
-            #             break
-            #     break
-            #     # except ContinueI:
-            #     #         continue
-            # print df.columns
-            # import pdb;pdb.set_trace()
             df= df.withColumn('Deal', lit(self.deal_name).cast(StringType()))
             if 'Source' not in df.columns:
                 df= df.withColumn('Source', lit(self.vendor_name).cast(StringType()))
@@ -332,7 +279,7 @@ class ETL_Processing(object):
                 df = df.withColumn("Play_Date", df["Play_Date"].cast(StringType()))
 
             source = set(df.columns)
-            payments_table = self.sqlCtx.read.jdbc(url=self.url, table="Payments", properties=self.properties)
+            payments_table = self.sqlCtx.read.jdbc(url=self.url, table="Payment", properties=self.properties)
             self.payments_columns = payments_table.columns
             destination = set(self.payments_columns)
             missing = destination - source
@@ -381,11 +328,11 @@ class ETL_Processing(object):
             if to_string_fields:
                 for i in to_string_fields:
                     payments_insert_df= payments_insert_df.withColumn(i,payments_insert_df[i].cast(StringType()))
-            logger.info(payments_insert_df.show(10))
-            logger.info(payments_insert_df.printSchema())
+            # logger.info(payments_insert_df.show(10))
+            # logger.info(payments_insert_df.printSchema())
 
             # print file_name
-            # payments_insert_df = payments_insert_df.withColumn('File_Name', lit(file_name).cast(StringType()))
+            payments_insert_df = payments_insert_df.withColumn('File_Name', lit(file_name).cast(StringType()))
             # print file_name
 
             # # # payments_insert_df=payments_insert_df.withColumn('Artist', self.lowercase_func('Artist')).withColumn('Track', self.lowercase_func('Track')).withColumn('Album', self.lowercase_func('Album'))
@@ -395,7 +342,7 @@ class ETL_Processing(object):
             payments_insert_df=payments_insert_df.withColumn("ISRC", self.isrc_null_check("ISRC"))
             logger.info("After ASCII Cast:: "+str(payments_insert_df.show(10)))
             # payments_insert_df.write.jdbc(self.url,
-            #       table="Payments",
+            #       table="Payment",
             #       mode="append",
             #       properties=self.properties)
             # logger.info("Successfully inserted into payments ")
@@ -413,6 +360,7 @@ class ETL_Processing(object):
         try:
             logger.info("Inside mysqldb_song_table_update() method ")
             if song_id_list:
+                print song_id_list
                 db = MySQLdb.connect(self.mysqldb_port,self.mysqldb_user,self.mysqldb_password,self.mysqldb_database_name)
                 cursor = db.cursor()
                 if len(song_id_list) == 1:
@@ -456,13 +404,16 @@ class ETL_Processing(object):
                         df_songs=df_songs.withColumn(col_name, self.lowercase_func(col_name))
                 df_songs = df_songs.withColumn('Release_Date', self.date_func('Release_Date'))
                 #df_songs = df_songs.withColumn('Artist', self.lowercase_func('Artist')).withColumn('Track', self.lowercase_func('Track')).withColumn('Album', self.lowercase_func('Album')).withColumn('Release_Date', self.date_func('Release_Date'))
-                df_songs_grby = df_songs.groupBy('Artist', 'Track', 'Album').agg(sf.min('Release_Date')).withColumnRenamed('min(Release_Date)', 'Release_Date')
-                cond = ['Artist', 'Track', 'Album']
-                df_songs_join = df_songs_grby.join(df_songs, cond, 'left').drop(df_songs.Release_Date).withColumnRenamed('min(Release_Date)', 'Release_Date')
-                df_songs_insert = df_songs_join.dropDuplicates()
+                df_songs_grby = df_songs.groupBy('ISRC','Artist', 'Track', 'Album').agg(sf.min('Release_Date')).withColumnRenamed('min(Release_Date)', 'Release_Date')
+                # cond = ['Artist', 'Track', 'Album']
+                # df_songs_join = df_songs_grby.join(df_songs, cond, 'left').drop(df_songs.Release_Date).withColumnRenamed('min(Release_Date)', 'Release_Date')
+                df_songs_insert = df_songs_grby.dropDuplicates()
 
             df_songs_insert = df_songs_insert.withColumn('is_latest', lit('Y').cast(StringType()))
+            df_songs_insert = df_songs_insert.withColumn('Album',sf.when(sf.isnull('Album'), lit(' ')).otherwise(df_songs_insert.Album))
+            df_songs_insert = df_songs_insert.withColumn('ISRC',sf.when(sf.isnull('ISRC'), lit(' ')).otherwise(df_songs_insert.ISRC))
 
+            # df_songs_insert.show(200)
             if songs_table_count == 0:
                 #df_songs_insert.write.jdbc(self.url, table="Song", mode="append", properties=self.properties)
                 songId_is_not_latest =[]
@@ -470,45 +421,79 @@ class ETL_Processing(object):
 
             else:
                 df_songs_renamed = df_songs_insert.withColumnRenamed('Artist', 'dfArtist').withColumnRenamed('Track', 'dfTrack').withColumnRenamed('Album', 'dfAlbum').withColumnRenamed('ISRC', 'dfISRC').withColumnRenamed('Release_Date', 'dfRelease_Date').withColumnRenamed('is_latest', 'dfis_latest')
-                conds = [songs_table.Artist == df_songs_renamed.dfArtist, songs_table.Track == df_songs_renamed.dfTrack, songs_table.Album == df_songs_renamed.dfAlbum]
+                # conds = [songs_table.Artist == df_songs_renamed.dfArtist, songs_table.Track == df_songs_renamed.dfTrack, songs_table.Album == df_songs_renamed.dfAlbum]
+                # conds = [songs_table.ISRC == df_songs_renamed.dfISRC, songs_table.Artist == df_songs_renamed.dfArtist, songs_table.Track == df_songs_renamed.dfTrack]
                 # songs_table.coalesce(1).write.format("com.databricks.spark.csv").option("header", "true").save("/home/nithish/Downloads/songstable.csv")
                 # df_songs_insert.coalesce(1).write.format("com.databricks.spark.csv").option("header", "true").save("/home/nithish/Downloads/currentfile.csv")
                 songs_table = songs_table.where(songs_table.is_latest == 'Y')
-                df_songs_table = songs_table.join(df_songs_renamed, conds, 'fullouter')
+
+                songs_table = songs_table.withColumn('Album',sf.when(sf.isnull('Album'), lit(' ')).otherwise(songs_table.Album))
+                songs_table = songs_table.withColumn('ISRC',sf.when(sf.isnull('ISRC'), lit(' ')).otherwise(songs_table.ISRC))
+                df_songs_renamed = df_songs_renamed.withColumn('dfAlbum',sf.when(sf.isnull('dfAlbum'), lit(' ')).otherwise(df_songs_renamed.dfAlbum))
+                df_songs_renamed = df_songs_renamed.withColumn('dfISRC',sf.when(sf.isnull('dfISRC'), lit(' ')).otherwise(df_songs_renamed.dfISRC))
+
+                # songs_table = songs_table.withColumn('ISRC',sf.when(self.null_val_udf('ISRC'), lit('-')).otherwise(songs_table.ISRC))
+                # df_songs_renamed = df_songs_renamed.withColumn('dfISRC',sf.when(self.null_val_udf('dfISRC'), lit('-')).otherwise(df_songs_renamed.dfISRC))
+
+                # songs_table_filled = songs_table.na.fill('-')
+                # df_songs_filled = df_songs_renamed.na.fill('-')
+
+                # print "Songs Table"
+                # songs_table.show(1000)
+                # print "Current DF"
+                # df_songs_renamed.show(1000)
+
+                df_songs_table = songs_table.join(df_songs_renamed, (songs_table.ISRC == df_songs_renamed.dfISRC) & (songs_table.Artist == df_songs_renamed.dfArtist) & (songs_table.Track == df_songs_renamed.dfTrack) & (songs_table.Album == df_songs_renamed.dfAlbum), 'fullouter')
+                # df_songs_table = songs_table.join(df_songs_renamed, conds, 'fullouter')
+                # df_songs_table.show(1000)
+                # print "joined"
                 df_songs_table_append = df_songs_table.where(sf.isnull(df_songs_table.ISRC) & sf.isnull(df_songs_table.Track) & sf.isnull(df_songs_table.Artist) & sf.isnull(df_songs_table.Album) & sf.isnull(df_songs_table.Release_Date) & sf.isnull(df_songs_table.is_latest) & sf.isnull(df_songs_table.id))
+                # print "filtering"
+                # df_songs_table_append.show(1000)
                 df_songs_table_append = df_songs_table_append.drop('id').drop('Artist').drop('Album').drop('Track').drop('ISRC').drop('Release_Date').drop('is_latest')
                 df_songs_table_append = df_songs_table_append.withColumnRenamed('dfArtist', 'Artist').withColumnRenamed('dfTrack', 'Track').withColumnRenamed('dfAlbum', 'Album').withColumnRenamed('dfISRC', 'ISRC').withColumnRenamed('dfRelease_Date', 'Release_Date').withColumnRenamed('dfis_latest', 'is_latest')
+                # print "col renamed"
+                # df_songs_table_append.show(1000)
                 df_songs_table_append = df_songs_table_append.dropDuplicates()
-                if df_songs_table_append:
-                    logger.info(df_songs_table_append.show(1))
+                # print "dup dropped"
+                # df_songs_table_append.show(1000)
+                # if df_songs_table_append:
+                #     logger.info(df_songs_table_append.show(1))
                 #df_songs_table_append.write.jdbc(self.url, table="Song", mode="append", properties=self.properties)
                 min_date_udf = udf(lambda x, y: 0 if (x <= y) else 1, IntegerType())
                 ISRC_null_check_udf = udf(lambda x: 1 if (x == '' or x is None) else 0, IntegerType())
                 df_songs_table_update = df_songs_table.where(df_songs_table.ISRC.isNotNull() & df_songs_table.Track.isNotNull() & df_songs_table.Artist.isNotNull() & df_songs_table.Album.isNotNull() & df_songs_table.Release_Date.isNotNull() & df_songs_table.is_latest.isNotNull())
                 df_songs_table_update = df_songs_table_update.where(df_songs_table_update.dfISRC.isNotNull() & df_songs_table_update.dfTrack.isNotNull() & df_songs_table_update.dfArtist.isNotNull() & df_songs_table_update.dfAlbum.isNotNull() & df_songs_table_update.dfRelease_Date.isNotNull() & df_songs_table_update.dfis_latest.isNotNull())
                 df_songs_table_update = df_songs_table_update.drop(df_songs_table_update.dfTrack).drop(df_songs_table_update.dfArtist).drop(df_songs_table_update.dfAlbum)
+                # print "up filtered"
+                # df_songs_table_update.show(1000)
                 df_songs_table_update = df_songs_table_update.withColumn('ISRCFlag', ISRC_null_check_udf('ISRC'))
                 df_songs_table_update = df_songs_table_update.withColumn('dfISRCFlag', ISRC_null_check_udf('dfISRC'))
                 df_songs_table_update = df_songs_table_update.withColumn('updateISRCFlag', sf.when((df_songs_table_update.ISRCFlag == 1) & (df_songs_table_update.dfISRCFlag == 0), 1).otherwise(0))
                 df_songs_table_update = df_songs_table_update.withColumn("ISRC", sf.when(sf.isnull("ISRC"), df_songs_table_update.dfISRC).otherwise(df_songs_table_update.ISRC).alias("ISRC"))
                 df_songs_table_update = df_songs_table_update.withColumn('updateReleaseDateFlag', min_date_udf('Release_Date', 'dfRelease_Date'))
+                # print "up flagged"
+                # df_songs_table_update.show(1000)
                 df_songs_table_update = df_songs_table_update.where((df_songs_table_update.updateReleaseDateFlag == 1) | (df_songs_table_update.updateISRCFlag ==1))
+                # print "up to be updated filter"
+                # df_songs_table_update.show(1000)
                 df_songs_table_update = df_songs_table_update.withColumn("ISRC", sf.when(df_songs_table_update.updateISRCFlag ==1, df_songs_table_update.dfISRC).otherwise(df_songs_table_update.ISRC).alias("ISRC"))
                 df_songs_table_update = df_songs_table_update.withColumn("Release_Date", sf.when(df_songs_table_update.updateReleaseDateFlag ==1, df_songs_table_update.dfRelease_Date).otherwise(df_songs_table_update.Release_Date).alias("Release_Date"))
                 df_songs_table_update = df_songs_table_update.drop('dfis_latest').drop('ISRCFlag').drop('dfISRCFlag').drop('updateISRCFlag').drop('dfISRC').drop('dfRelease_Date').drop('updateReleaseDateFlag')
                 df_id = df_songs_table_update
                 songId_is_not_latest = df_id.select('id').rdd.flatMap(lambda x: x).collect()
+                print songId_is_not_latest
                 df_songs_table_update = df_songs_table_update.drop('id')
                 df_songs_table_update = df_songs_table_update.dropDuplicates()
-                if df_songs_table_update:
-                    logger.info(df_songs_table_update.show(1))
+                # if df_songs_table_update:
+                #     logger.info(df_songs_table_update.show(1))
                 #df_songs_table_update.write.jdbc(self.url, table="Song", mode="append", properties=self.properties)
 
                 def unionAll(*dfs):
                     return reduce(DataFrame.unionAll, dfs)
                 song_insert_df=unionAll(df_songs_table_append,df_songs_table_update)
                 print "before union all print"
-                song_insert_df.show(1)
+                song_insert_df.show(1000)
 
                 return song_insert_df, songId_is_not_latest
         except Exception,e:
@@ -559,9 +544,9 @@ def main(sqlCtx,file_path,property_file_path,logger):
     """
     try:
         logger.info("Inside Main Function")
-        mysqldb_port = "soundhousetestdb.c4q9tpcfjner.us-east-2.rds.amazonaws.com"
-        mysqldb_user = "admin"
-        mysqldb_password = "admin123"
+        mysqldb_port = "soundhousemasterdb.c4q9tpcfjner.us-east-2.rds.amazonaws.com"
+        mysqldb_user = "dbadmin"
+        mysqldb_password = "dbadmin123"
         mysqldb_database_name = "SoundHouse"
         etl_obj = ETL_Processing(sqlCtx,property_file_path,logger)
         etl_obj.deal_vendor_parsing(file_path)
@@ -605,10 +590,10 @@ def main(sqlCtx,file_path,property_file_path,logger):
                         song_insert_df,songId_list_toUpdate= etl_obj.song_table_insert(df)
 
                         payments_insert_df.show(1)
-                        song_insert_df.show(1)
+                        # song_insert_df.show(1)
                         if meta_insert_df:
                             etl_obj.jdbc_write(meta_insert_df,"Metadata_Management")
-                        etl_obj.jdbc_write(payments_insert_df,"Payments")
+                        etl_obj.jdbc_write(payments_insert_df,"Payment")
                         etl_obj.jdbc_write(song_insert_df,"Song")
                         etl_obj.mysqldb_song_table_update(songId_list_toUpdate)
                         etl_obj.update_file_processed_table(file_name,payments_insert_df)
@@ -665,8 +650,6 @@ if __name__ == '__main__':
     print(property_file_path)
     #len(sys.argv)<2
     main(sqlCtx,file_path,property_file_path,logger)
-
-
 
 
 
