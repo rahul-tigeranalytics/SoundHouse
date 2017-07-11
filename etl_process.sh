@@ -1,1 +1,1 @@
-spark-submit --driver-memory 4g --executor-memory 4g --packages mysql:mysql-connector-java:5.1.39,com.databricks:spark-csv_2.10:1.4.0 etl_main.py "s3n://soundhousellc/Anthem Lights/SX-RO/" "s3n://soundhousellc/property_mapping_file/property_file.py" &
+spark-submit --driver-memory 4g --executor-memory 4g --packages mysql:mysql-connector-java:5.1.39,com.databricks:spark-csv_2.10:1.4.0 latest_aws_main.py "s3n://soundhousellc/Lee Brice/SX-FA/" "s3n://soundhousellc/property_mapping_file/property_file.py" &
