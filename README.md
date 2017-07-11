@@ -10,7 +10,7 @@ Is this ok [y/d/N]: y
 
 ....
 
-~]$ sudo pip install 
+~]$ sudo pip install s3fs
 
 ~]$ cd /home/hadoop/
 
