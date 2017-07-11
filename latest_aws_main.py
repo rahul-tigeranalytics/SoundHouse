@@ -16,6 +16,7 @@ from pyspark.sql.functions import lit,lower,upper
 from pyspark.sql.types import DateType
 from pyspark.sql.functions import col, udf
 from pyspark import SparkContext, SparkConf
+import s3fs
 
 class ETL_Processing(object):
     def __init__(self,sqlCtx,property_file_path,logger):
@@ -35,7 +36,15 @@ class ETL_Processing(object):
         self.sqlCtx = sqlCtx
         self.url="jdbc:mysql://soundhousemasterdb.c4q9tpcfjner.us-east-2.rds.amazonaws.com:3306/SoundHouse?user=dbadmin&password=dbadmin123&autoReconnect=true&useSSL=false"
         self.properties={"driver":'com.mysql.jdbc.Driver'}
-        execfile(property_file_path)
+        fs = s3fs.S3FileSystem(anon=True)
+        meta_file = open('/tmp/meta_file.py', 'w')
+        with fs.open('soundhousellc/'+str(property_file_path.split('soundhousellc/')[1])) as f:
+            meta_file.write(f.read())
+            # print f.read()
+            # import pdb;pdb.set_trace()
+        meta_file.close()
+        execfile('/tmp/meta_file.py')
+        #fs.close()
         # print locals()['metadata_property']
         # import pdb;pdb.set_trace()
         # The property file should always have the dict variable name as "metadata_property"
@@ -339,7 +348,7 @@ class ETL_Processing(object):
             for col_name in payments_insert_df.columns:
                 if col_name in self.title_case_cols:
                     payments_insert_df=payments_insert_df.withColumn(col_name, self.lowercase_func(col_name))
-            payments_insert_df=payments_insert_df.withColumn("ISRC", self.isrc_null_check("ISRC"))
+            payments_insert_df=payments_insert_df.withColumn("ISRC", sf.when(self.null_val_udf('ISRC'), None).otherwise(col('ISRC').alias('ISRC')))
             logger.info("After ASCII Cast:: "+str(payments_insert_df.show(10)))
             # payments_insert_df.write.jdbc(self.url,
             #       table="Payment",
@@ -549,8 +558,14 @@ def main(sqlCtx,file_path,property_file_path,logger):
         mysqldb_password = "dbadmin123"
         mysqldb_database_name = "SoundHouse"
         etl_obj = ETL_Processing(sqlCtx,property_file_path,logger)
+        fs = s3fs.S3FileSystem(anon=True)
+
         etl_obj.deal_vendor_parsing(file_path)
-        source_file_list= glob.glob(file_path+'*.csv')
+        source_file_list=[]
+        for i in  fs.ls('soundhousellc/'+str(file_path.split('soundhousellc/')[1])):
+            if i.split('.')[-1]=='csv':
+                source_file_list.append(i)
+        #source_file_list= glob.glob(file_path+'*.csv')
         logger.info("Source Files List to be processed : "+str(source_file_list))
         if source_file_list:
             for source_file in source_file_list:
@@ -564,7 +579,7 @@ def main(sqlCtx,file_path,property_file_path,logger):
                         df = (sqlCtx.read.format("com.databricks.spark.csv")
                                           .option("header", "true")
                                           .option("charset", "utf-8")
-                                          .load(source_file))
+                                          .load("s3n://"+source_file))
                         print "File being read................"
 
                         def nonasciireplacer(text):
@@ -650,7 +665,3 @@ if __name__ == '__main__':
     print(property_file_path)
     #len(sys.argv)<2
     main(sqlCtx,file_path,property_file_path,logger)
-
-
-
-
