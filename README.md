@@ -24,9 +24,10 @@ Is this ok [y/d/N]: y
 
 ~]$  cd SoundHouse
 
-~]$  cd SoundHouse
-
 ~]$  chmod 775 etl_process.sh
+
+~]$ vim etl_process.sh
+#Configure the  Deal/Vendor/ folder path in this 
 
 ~]$ ./etl_process.sh
 
