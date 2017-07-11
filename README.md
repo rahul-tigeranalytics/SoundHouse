@@ -7,7 +7,10 @@ Once you have logged in to EMR instance
 ...
 
 Is this ok [y/d/N]: y
+
 ....
+
+~]$ sudo pip install 
 
 ~]$ cd /home/hadoop/
 
@@ -15,9 +18,17 @@ Is this ok [y/d/N]: y
 
 ~]$ cd soundhouse_etl
 
+
+
 ~]$ git clone https://github.com/rahul-tigeranalytics/SoundHouse
 
-~]$ 
+~]$  cd SoundHouse
+
+~]$  cd SoundHouse
+
+~]$  chmod 775 etl_process.sh
+
+~]$ ./etl_process.sh
 
 
 
